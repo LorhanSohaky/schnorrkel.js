@@ -16,10 +16,11 @@ describe('testing sumSigs', () => {
 
     const publicNonces = [publicNoncesOne, publicNoncesTwo]
     const publicKeys = [keyPairOne.publicKey, keyPairTwo.publicKey]
+    const combinedPublicKey = Schnorrkel.getCombinedPublicKey(publicKeys)
 
     const msg = 'test message'
-    const signatureOne = schnorrkelOne.multiSigSign(keyPairOne.privateKey, msg, publicKeys, publicNonces)
-    const signatureTwo = schnorrkelTwo.multiSigSign(keyPairTwo.privateKey, msg, publicKeys, publicNonces)
+    const signatureOne = schnorrkelOne.multiSigSign(keyPairOne.privateKey, msg, combinedPublicKey, publicNonces)
+    const signatureTwo = schnorrkelTwo.multiSigSign(keyPairTwo.privateKey, msg, combinedPublicKey, publicNonces)
 
     const signatures = [signatureOne.signature, signatureTwo.signature]
     const signature = Schnorrkel.sumSigs(signatures)

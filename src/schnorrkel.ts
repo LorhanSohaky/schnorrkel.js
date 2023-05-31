@@ -26,29 +26,6 @@ class Schnorrkel {
     return hash
   }
 
-  static getCombinedPublicKey(publicKeys: Array<Key>): Key {
-    if (publicKeys.length < 2) {
-      throw Error('At least 2 public keys should be provided')
-    }
-
-    const bufferPublicKeys = publicKeys.map(publicKey => publicKey.buffer)
-    const L = _generateL(bufferPublicKeys)
-
-    const modifiedKeys = bufferPublicKeys.map(publicKey => {
-      return secp256k1.publicKeyTweakMul(publicKey, _aCoefficient(publicKey, L))
-    })
-
-    return new Key(Buffer.from(secp256k1.publicKeyCombine(modifiedKeys)))
-  }
-
-  static getCombinedAddress(publicKeys: Array<Key>): string {
-    if (publicKeys.length < 2) throw Error('At least 2 public keys should be provided')
-
-    const combinedPublicKey = Schnorrkel.getCombinedPublicKey(publicKeys)
-    const px = _generatePk(combinedPublicKey.buffer)
-    return px
-  }
-
   generatePublicNonces(privateKey: Key): PublicNonces {
     const hash = this._setNonce(privateKey.buffer)
     const nonce = this.nonces[hash]
@@ -64,40 +41,6 @@ class Schnorrkel {
     const hash = _hashPrivateKey(x)
 
     delete this.nonces[hash]
-  }
-
-  multiSigSign(privateKey: Key, msg: string, publicKeys: Key[], publicNonces: PublicNonces[]): SignatureOutput {
-    const combinedPublicKey = Schnorrkel.getCombinedPublicKey(publicKeys)
-    const mappedPublicNonce: InternalPublicNonces[] = publicNonces.map(publicNonce => {
-      return {
-        kPublic: publicNonce.kPublic.buffer,
-        kTwoPublic: publicNonce.kTwoPublic.buffer,
-      }
-    })
-
-    const mappedNonces: InternalNonces = Object.fromEntries(Object.entries(this.nonces).map(([hash, nonce]) => {
-      return [
-        hash,
-        {
-          k: nonce.k.buffer,
-          kTwo: nonce.kTwo.buffer,
-          kPublic: nonce.kPublic.buffer,
-          kTwoPublic: nonce.kTwoPublic.buffer,
-        }
-      ]
-    }))
-
-    const musigData = _multiSigSign(mappedNonces, combinedPublicKey.buffer, privateKey.buffer, msg, publicKeys.map(key => key.buffer), mappedPublicNonce)
-
-    // absolutely crucial to delete the nonces once a signature has been crafted with them.
-    // nonce reusae will lead to private key leakage!
-    this.clearNonces(privateKey)
-
-    return {
-      signature: new Signature(Buffer.from(musigData.signature)),
-      finalPublicNonce: new FinalPublicNonce(Buffer.from(musigData.finalPublicNonce)),
-      challenge: new Challenge(Buffer.from(musigData.challenge)),
-    }
   }
 
   static sign(privateKey: Key, msg: string): SignatureOutput {
@@ -118,6 +61,114 @@ class Schnorrkel {
 
   static verify(signaturesSummed: Signature, msg: string, finalPublicNonce: FinalPublicNonce, publicKey: Key): boolean {
     return _verify(signaturesSummed.buffer, msg, finalPublicNonce.buffer, publicKey.buffer)
+  }
+
+  static getCombinedPublicKey(publicKeys: Array<Key>): {
+    combinedKey: Key,
+    hashedKey: string,
+  } {
+    if (publicKeys.length < 2) {
+      throw Error('At least 2 public keys should be provided')
+    }
+
+    const bufferPublicKeys = publicKeys.map(publicKey => publicKey.buffer)
+    const hashedKey = _generateHashWithSalt(bufferPublicKeys)
+
+    const modifiedKeys = bufferPublicKeys.map(publicKey => {
+      return secp256k1.publicKeyTweakMul(publicKey, _aCoefficient(publicKey, hashedKey))
+    })
+
+    return {
+      combinedKey: new Key(Buffer.from(secp256k1.publicKeyCombine(modifiedKeys))),
+      hashedKey
+    }
+  }
+
+  multiSigSign(privateKey: Key, msg: string, combinedPublicKey: {
+    combinedKey: Key,
+    hashedKey: string
+  }, publicNonces: PublicNonces[]): SignatureOutput {
+    const mappedPublicNonce: InternalPublicNonces[] = publicNonces.map(publicNonce => {
+      return {
+        kPublic: publicNonce.kPublic.buffer,
+        kTwoPublic: publicNonce.kTwoPublic.buffer,
+      }
+    })
+
+    const mappedNonces: InternalNonces = Object.fromEntries(Object.entries(this.nonces).map(([hash, nonce]) => {
+      return [
+        hash,
+        {
+          k: nonce.k.buffer,
+          kTwo: nonce.kTwo.buffer,
+          kPublic: nonce.kPublic.buffer,
+          kTwoPublic: nonce.kTwoPublic.buffer,
+        }
+      ]
+    }))
+
+    const musigData = _multiSigSignWithHash(mappedNonces, combinedPublicKey.combinedKey.buffer, combinedPublicKey.hashedKey, privateKey.buffer, msg, mappedPublicNonce)
+
+    // absolutely crucial to delete the nonces once a signature has been crafted with them.
+    // nonce reusae will lead to private key leakage!
+    this.clearNonces(privateKey)
+
+    return {
+      signature: new Signature(Buffer.from(musigData.signature)),
+      finalPublicNonce: new FinalPublicNonce(Buffer.from(musigData.finalPublicNonce)),
+      challenge: new Challenge(Buffer.from(musigData.challenge)),
+    }
+  }
+
+  static fromJson(json: string): Schnorrkel {
+    interface JsonData {
+      nonces: {
+        [hash: string]: {
+          k: string,
+          kTwo: string,
+          kPublic: string,
+          kTwoPublic: string,
+        }
+      }
+    }
+    try {
+      const jsonData = JSON.parse(json) as JsonData
+      const noncesEntries = Object.entries(jsonData.nonces).map(([hash, nonce]) => {
+        return [
+          hash,
+          {
+            k: Key.fromHex(nonce.k),
+            kTwo: Key.fromHex(nonce.kTwo),
+            kPublic: Key.fromHex(nonce.kPublic),
+            kTwoPublic: Key.fromHex(nonce.kTwoPublic),
+          }
+        ]
+      })
+
+      const schnorrkel = new Schnorrkel()
+      schnorrkel.nonces = Object.fromEntries(noncesEntries)
+      return schnorrkel
+    } catch (error) {
+      throw new Error('Invalid JSON')
+    }
+  }
+
+  toJson() {
+    const nonces = Object.fromEntries(Object.entries(this.nonces).map(([hash, nonce]) => {
+      return [
+        hash,
+        {
+          k: nonce.k.toHex(),
+          kTwo: nonce.kTwo.toHex(),
+          kPublic: nonce.kPublic.toHex(),
+          kTwoPublic: nonce.kTwoPublic.toHex(),
+        }
+      ]
+    }))
+
+    return JSON.stringify({
+      nonces,
+    })
   }
 }
 

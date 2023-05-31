@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import {UnsafeSchnorrkel} from '../../src/index'
+import Schnorrkel from '../../src/index'
 import { _hashPrivateKey, generateRandomKeys } from '../../src/core'
 
 
 describe('testing generatePublicNonces', () => {
   it('should overwrite public nonces with same private key', () => {
-    const schnorrkel = new UnsafeSchnorrkel()
+    const schnorrkel = new Schnorrkel()
 
     const keyPair = generateRandomKeys()
     const publicNoncesOne = schnorrkel.generatePublicNonces(keyPair.privateKey)
