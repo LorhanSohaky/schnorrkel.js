@@ -16,25 +16,15 @@ describe('testing multiSigSign', () => {
 
     const publicNonces = [publicNoncesOne, publicNoncesTwo]
     const publicKeys = [keyPairOne.publicKey, keyPairTwo.publicKey]
+    const combinedKey = Schnorrkel.getCombinedPublicKey(publicKeys)
 
     const msg = 'test message'
-    const signature = schnorrkelOne.multiSigSign(keyPairOne.privateKey, msg, publicKeys, publicNonces)
+    const signature = schnorrkelOne.multiSigSign(keyPairOne.privateKey, msg, combinedKey, publicNonces)
 
     expect(signature).toBeDefined()
     expect(signature.finalPublicNonce.buffer).toHaveLength(33)
     expect(signature.signature.buffer).toHaveLength(32)
     expect(signature.challenge.buffer).toHaveLength(32)
-  })
-
-  it('should requires two public keys or more', () => {
-    const schnorrkel = new Schnorrkel()
-    const keyPair = generateRandomKeys()
-    const publicNonces = schnorrkel.generatePublicNonces(keyPair.privateKey)
-
-    const msg = 'test message'
-    const publicKeys = [keyPair.publicKey]
-
-    expect(() => schnorrkel.multiSigSign(keyPair.privateKey, msg, publicKeys, [publicNonces])).toThrowError('At least 2 public keys should be provided')
   })
 
   it('should requires nonces', () => {
@@ -44,7 +34,8 @@ describe('testing multiSigSign', () => {
 
     const msg = 'test message'
     const publicKeys = [keyPairOne.publicKey, keyPairTwo.publicKey]
+    const combinedKey = Schnorrkel.getCombinedPublicKey(publicKeys)
 
-    expect(() => schnorrkel.multiSigSign(keyPairOne.privateKey, msg, publicKeys, [])).toThrowError('Nonces should be exchanged before signing')
+    expect(() => schnorrkel.multiSigSign(keyPairOne.privateKey, msg, combinedKey, [])).toThrowError('Nonces should be exchanged before signing')
   })
 })
