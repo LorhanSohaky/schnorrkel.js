@@ -1,6 +1,6 @@
 {
-  "name": "@borislav.itskov/schnorrkel.js",
-  "version": "2.0.0",
+  "name": "@lorhansohaky/schnorrkel.js",
+  "version": "1.0.0",
   "description": "",
   "type": "commonjs",
   "main": "dist/es5/index.js",
@@ -20,8 +20,8 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest watch"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Lorhan Sohaky",
+  "license": "MIT",
   "dependencies": {
     "bigi": "^1.4.2",
     "ecurve": "^1.0.6",
@@ -38,6 +38,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/borislav-itskov/schnorrkel.js"
+    "url": "https://github.com/LorhanSohaky/schnorrkel.js"
   }
 }
