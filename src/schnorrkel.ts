@@ -36,6 +36,20 @@ class Schnorrkel {
     }
   }
 
+  getPublicNonces(privateKey: Key): PublicNonces {
+    const hash = _hashPrivateKey(privateKey.buffer)
+    const nonce = this.nonces[hash]
+
+    if (!nonce) {
+      throw Error('Nonces not found')
+    }
+
+    return {
+      kPublic: nonce.kPublic,
+      kTwoPublic: nonce.kTwoPublic,
+    }
+  }
+
   protected clearNonces(privateKey: Key): void {
     const x = privateKey.buffer
     const hash = _hashPrivateKey(x)
@@ -63,7 +77,7 @@ class Schnorrkel {
     return _verify(signature.buffer, msg, finalPublicNonce.buffer, publicKey.buffer)
   }
 
-  static getCombinedPublicKey(publicKeys: Array<Key>, hexSecret?:string): {
+  static getCombinedPublicKey(publicKeys: Array<Key>, hexSecret?: string): {
     combinedKey: Key,
     hashedKey: string,
   } {
