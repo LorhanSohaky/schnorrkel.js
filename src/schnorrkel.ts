@@ -2,7 +2,7 @@ import secp256k1 from 'secp256k1'
 
 import { Key, Nonces, PublicNonces, Signature, NoncePairs } from './types'
 
-import { _generateL, _aCoefficient, _generatePublicNonces, _multiSigSign, _hashPrivateKey, _sumSigs, _verify, _generatePk, _sign, _generateHashWithSalt, _multiSigSignWithHash } from './core'
+import { _generateL, _aCoefficient, _generatePublicNonces, _multiSigSign, _hashPrivateKey, _sumSigs, _verify, _generatePk, _sign, _generateHashWithSecret, _multiSigSignWithHash } from './core'
 import { InternalNonces, InternalPublicNonces } from './core/types'
 import { Challenge, FinalPublicNonce, SignatureOutput } from './types/signature'
 
@@ -63,7 +63,7 @@ class Schnorrkel {
     return _verify(signature.buffer, msg, finalPublicNonce.buffer, publicKey.buffer)
   }
 
-  static getCombinedPublicKey(publicKeys: Array<Key>): {
+  static getCombinedPublicKey(publicKeys: Array<Key>, hexSecret?:string): {
     combinedKey: Key,
     hashedKey: string,
   } {
@@ -72,7 +72,7 @@ class Schnorrkel {
     }
 
     const bufferPublicKeys = publicKeys.map(publicKey => publicKey.buffer)
-    const hashedKey = _generateHashWithSalt(bufferPublicKeys)
+    const hashedKey = _generateHashWithSecret(bufferPublicKeys, hexSecret)
 
     const modifiedKeys = bufferPublicKeys.map(publicKey => {
       return secp256k1.publicKeyTweakMul(publicKey, _aCoefficient(publicKey, hashedKey))

@@ -15,9 +15,29 @@ const EC = elliptic.ec
 const ec = new EC('secp256k1')
 const generatorPoint = ec.g
 
-export const _generateHashWithSalt = (publicKeys: Array<Uint8Array>) => {
-  const salt = ethers.utils.randomBytes(32)
-  return ethers.utils.keccak256(_concatTypedArrays(publicKeys.concat(salt).sort()))
+export const _generateHashWithSecret = (publicKeys: Array<Uint8Array>, hexSecret?: string) => {
+  let internalPublicKeys = publicKeys
+
+  if (typeof hexSecret === 'string') {
+    if (hexSecret.length === 0) {
+      throw new Error('Secret cannot be empty')
+    }
+
+    const regexHex = /^[0-9A-Fa-f]+$/g;
+
+    if (!hexSecret.match(regexHex)) {
+      throw new Error('Secret should be a hex string')
+    }
+
+    const secretUint8Array = Uint8Array.from(Buffer.from(hexSecret, 'hex'))
+    if (secretUint8Array.length > 33) {
+      throw new Error('Secret should be 33 bytes or less')
+    }
+
+    internalPublicKeys = [...internalPublicKeys, secretUint8Array]
+  }
+
+  return ethers.utils.keccak256(_concatTypedArrays(internalPublicKeys.sort()))
 }
 
 export const _generateL = (publicKeys: Array<Uint8Array>) => {
