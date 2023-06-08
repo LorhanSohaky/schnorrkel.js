@@ -1,14 +1,16 @@
 {
   "name": "@lorhansohaky/schnorrkel.js",
+  "author": "Lorhan Sohaky",
+  "license": "MIT",
   "version": "1.0.0",
-  "description": "",
+  "description": "Schnorr signatures",
   "private": false,
   "type": "commonjs",
   "main": "dist/es5/index.js",
   "module": "dist/es6/index.js",
   "types": "dist/es6/index.d.ts",
   "engines": {
-    "node": ">=16.0.0, <20.0.0"
+    "node": ">=16.0.0, <21.0.0"
   },
   "files": [
     "dist",
@@ -22,8 +24,6 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest watch"
   },
-  "author": "Lorhan Sohaky",
-  "license": "MIT",
   "dependencies": {
     "bigi": "^1.4.2",
     "ecurve": "^1.0.6",
