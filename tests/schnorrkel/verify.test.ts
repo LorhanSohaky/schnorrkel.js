@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import Schnorrkel from '../../src/index'
+import Schnorrkel, { Key } from '../../src/index'
 import { _hashPrivateKey, generateRandomKeys } from '../../src/core'
-
+import { ethers } from 'ethers'
 
 describe('testing verify', () => {
   it('should verify signatures', () => {
@@ -27,6 +27,29 @@ describe('testing verify', () => {
     const result = Schnorrkel.verify(signaturesSummed, msg, signatureTwo.finalPublicNonce, combinedPublicKey.combinedKey)
 
     expect(result).toEqual(true)
+  })
+
+  it('should verify a normal schnorr signature and make sure sign does not overwrite the private key', () => {
+    const privateKey = new Key(Buffer.from(ethers.utils.randomBytes(32)))
+
+    const msg = 'test message'
+    const signature = Schnorrkel.sign(privateKey, msg)
+
+    const publicKey = ethers.utils.arrayify(
+      ethers.utils.computePublicKey(ethers.utils.computePublicKey(privateKey.buffer, false), true)
+    )
+
+    expect(signature).toBeDefined()
+    expect(signature.finalPublicNonce.buffer).toHaveLength(33)
+    expect(signature.signature.buffer).toHaveLength(32)
+    expect(signature.challenge.buffer).toHaveLength(32)
+    const result = Schnorrkel.verify(signature.signature, msg, signature.finalPublicNonce, new Key(Buffer.from(publicKey)))
+    expect(result).toEqual(true)
+
+    const secondMsg = 'this is another msg'
+    const secondSig = Schnorrkel.sign(privateKey, secondMsg)
+    const secondRes = Schnorrkel.verify(secondSig.signature, secondMsg, secondSig.finalPublicNonce, new Key(Buffer.from(publicKey)))
+    expect(secondRes).toEqual(true)
   })
 
   it('should fail to verify signatures', () => {

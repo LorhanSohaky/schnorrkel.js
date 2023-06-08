@@ -165,12 +165,13 @@ export const _multiSigSign = (nonces: InternalNonces, combinedPublicKey: Uint8Ar
     throw Error('At least 2 public keys should be provided')
   }
 
-  const xHashed = _hashPrivateKey(privateKey)
+  const localPk = new Uint8Array(privateKey)
+  const xHashed = _hashPrivateKey(localPk)
   if (!(xHashed in nonces) || Object.keys(nonces[xHashed]).length === 0) {
     throw Error('Nonces should be exchanged before signing')
   }
 
-  const publicKey = secp256k1.publicKeyCreate(privateKey)
+  const publicKey = secp256k1.publicKeyCreate(localPk)
   const L = _generateL(publicKeys)
   const msgHash = _hashMessage(msg)
   const a = _aCoefficient(publicKey, L)
@@ -194,7 +195,7 @@ export const _multiSigSign = (nonces: InternalNonces, combinedPublicKey: Uint8Ar
   const { k, kTwo } = nonces[xHashed]
 
   // xe = x * e
-  const xe = secp256k1.privateKeyTweakMul(privateKey, e)
+  const xe = secp256k1.privateKeyTweakMul(localPk, e)
 
   // xea = a * xe
   const xea = secp256k1.privateKeyTweakMul(xe, a)
@@ -326,9 +327,10 @@ export const _generatePk = (combinedPublicKey: Uint8Array): string => {
   return '0x' + px.slice(px.length - 40, px.length)
 }
 
-export const _sign = (privateKey: Uint8Array, msg: string): InternalSignature => {
+export const _sign = (privateKey: Uint8Array, msg: string): InternalSignature  => {
+  const localPk = new Uint8Array(privateKey)
   const hash = _hashMessage(msg)
-  const publicKey = secp256k1.publicKeyCreate((privateKey as any))
+  const publicKey = secp256k1.publicKeyCreate((localPk as any))
 
   // R = G * k
   var k = ethers.utils.randomBytes(32)
@@ -338,7 +340,7 @@ export const _sign = (privateKey: Uint8Array, msg: string): InternalSignature =>
   var e = challenge(R, hash, publicKey)
 
   // xe = x * e
-  var xe = secp256k1.privateKeyTweakMul((privateKey as any), e)
+  var xe = secp256k1.privateKeyTweakMul((localPk as any), e)
 
   // s = k + xe
   var s = secp256k1.privateKeyTweakAdd(k, xe)
