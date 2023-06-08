@@ -54,4 +54,36 @@ describe('testing verify', () => {
 
     expect(result).toEqual(false)
   })
+
+  it('should fail to verify signatures with wrong key pair', () => {
+    const schnorrkelClient = new Schnorrkel()
+    const schnorrkelServer = new Schnorrkel()
+
+    const keyPairServer = generateRandomKeys()
+
+    const sharedCombinedKey = (() => {
+      const keyPairChallenge = generateRandomKeys()
+      const publicKeys = [keyPairChallenge.publicKey, keyPairServer.publicKey]
+      const combinedPublicKey = Schnorrkel.getCombinedPublicKey(publicKeys)
+
+      return combinedPublicKey
+    })()
+
+    const keyPairClient = generateRandomKeys()
+    const publicNoncesClient = schnorrkelClient.generatePublicNonces(keyPairClient.privateKey)
+    const publicNoncesServer = schnorrkelServer.generatePublicNonces(keyPairServer.privateKey)
+    const publicNonces = [publicNoncesClient, publicNoncesServer]
+
+    const msg = 'test message'
+    const signatureClient = schnorrkelClient.multiSigSign(keyPairClient.privateKey, msg, sharedCombinedKey, publicNonces)
+
+    const combinedPublicKeyServer = Schnorrkel.getCombinedPublicKey([keyPairClient.publicKey, keyPairServer.publicKey])
+    const signatureServer = schnorrkelServer.multiSigSign(keyPairServer.privateKey, msg, combinedPublicKeyServer, publicNonces)
+
+    const signatures = [signatureClient.signature, signatureServer.signature]
+    const signaturesSummed = Schnorrkel.sumSigs(signatures)
+    const result = Schnorrkel.verify(signaturesSummed, msg, signatureServer.finalPublicNonce, combinedPublicKeyServer.combinedKey)
+
+    expect(result).toEqual(false)
+  })
 })
