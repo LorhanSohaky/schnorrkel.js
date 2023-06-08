@@ -87,6 +87,40 @@ export const generateRandomKeys = () => {
   return new KeyPair(data)
 }
 
+export const getKeyPairFromSeed = (seed: string) => {
+  let privKeyBytes: Buffer | undefined
+  let round = 0
+  do {
+    const seedUint8 = Uint8Array.from(Buffer.from(seed, 'hex'))
+    const iUint8 = Uint8Array.from(Buffer.from(round.toString(), 'hex'))
+    const mergedBuffer = Buffer.from(mergeUint8Arrays(seedUint8, iUint8))
+    const hash = ethers.utils.keccak256(mergedBuffer)
+    privKeyBytes = Buffer.from(hash.replace(/^0x/, ''), 'hex')
+    round++
+  } while (!secp256k1.privateKeyVerify(privKeyBytes))
+
+  const pubKey = Buffer.from(secp256k1.publicKeyCreate(privKeyBytes))
+
+  const data = {
+    publicKey: pubKey,
+    privateKey: privKeyBytes,
+  }
+
+  return new KeyPair(data)
+}
+
+const mergeUint8Arrays = (...arrays: Uint8Array[]): Uint8Array => {
+  const totalSize = arrays.reduce((acc, e) => acc + e.length, 0)
+  const merged = new Uint8Array(totalSize)
+
+  arrays.forEach((array, i, arrays) => {
+    const offset = arrays.slice(0, i).reduce((acc, e) => acc + e.length, 0)
+    merged.set(array, offset)
+  });
+
+  return merged
+}
+
 export const _hashPrivateKey = (privateKey: Uint8Array): string => {
   return ethers.utils.keccak256(privateKey)
 }
