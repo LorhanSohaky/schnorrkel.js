@@ -349,3 +349,12 @@ export const _sign = (privateKey: Uint8Array, msg: string): InternalSignature =>
     signature: s
   }
 }
+
+export const signProof = (msg: Buffer, privateKey: Buffer): Buffer => {
+  const output = secp256k1.ecdsaSign(msg, privateKey)
+  return Buffer.from(output.signature)
+}
+
+export const verifyProof = (msg: Buffer, signature: Buffer, publicKey: Buffer): boolean => {
+  return secp256k1.ecdsaVerify(signature, msg, publicKey)
+}
