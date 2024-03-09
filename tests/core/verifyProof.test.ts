@@ -22,7 +22,7 @@ describe('testing verifyProof', () => {
 
     const msg = sha256('msg example')
     const invalidProof = signProof(Buffer.from(msg, 'hex'), otherKeyPair.privateKey.buffer)
-    
+
     const result = verifyProof(Buffer.from(msg, 'hex'), invalidProof, keyPairOne.publicKey.buffer)
     expect(result).toBeFalsy()
   })

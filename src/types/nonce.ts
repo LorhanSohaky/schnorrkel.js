@@ -12,7 +12,6 @@ export interface PublicNonces {
   readonly kTwoPublic: Key,
 }
 
-
 export type Nonces = {
   [privateKey: string]: NoncePairs
 }

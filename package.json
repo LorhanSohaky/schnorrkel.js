@@ -6,9 +6,8 @@
   "description": "Schnorr signatures",
   "private": false,
   "type": "commonjs",
-  "main": "dist/es5/index.js",
-  "module": "dist/es6/index.js",
-  "types": "dist/es6/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "engines": {
     "node": ">=16.0.0, <21.0.0"
   },
@@ -18,7 +17,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc --declaration && tsc -p tsconfig.es5.json --declaration",
+    "build": "tsc",
     "watch": "tsc -w",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
