@@ -48,9 +48,11 @@ describe('testing getCombinedPublicKey', () => {
     const keyPairTwo = generateRandomKeys()
     const publicKeys = [keyPairOne.publicKey, keyPairTwo.publicKey]
 
-    for (let i = 1; i < 34; i++) {
-      const secret = Buffer.from(ethers.utils.randomBytes(i)).toString('hex')
-      expect(() => Schnorrkel.getCombinedPublicKey(publicKeys, secret)).not.toThrow()
+    for (let i = 0; i < 100; i++) {
+      for (let j = 1; j < 34; j++) {
+        const secret = Buffer.from(ethers.utils.randomBytes(j)).toString('hex')
+        expect(() => Schnorrkel.getCombinedPublicKey(publicKeys, secret)).not.toThrow()
+      }
     }
   })
 

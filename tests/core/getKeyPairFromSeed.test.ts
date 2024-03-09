@@ -17,7 +17,7 @@ describe('testing getKeyPairFromSeed', () => {
 
     expect(publicKeyOne).toHaveLength(66)
     expect(privateKeyOne).toHaveLength(64)
-    
+
     expect(publicKeyOne).toEqual(publicKeyTwo)
     expect(privateKeyOne).toEqual(privateKeyTwo)
   })
@@ -25,10 +25,10 @@ describe('testing getKeyPairFromSeed', () => {
   it('should get key pair from argon2 seed', async () => {
     const flag = 'CTF-BR{}'
     const seed = await argon2.hash(flag, {
-      salt: Buffer.from('KoVNy6Blq3vFpmdgAXO9MQ==','base64'),
+      salt: Buffer.from('KoVNy6Blq3vFpmdgAXO9MQ==', 'base64'),
       timeCost: 2,
       memoryCost: 2048,
-      raw:true
+      raw: true
     }).then(buffer => buffer.toString('hex'))
 
     const keyPairOne = getKeyPairFromSeed(seed)
@@ -41,7 +41,7 @@ describe('testing getKeyPairFromSeed', () => {
 
     expect(publicKeyOne).toHaveLength(66)
     expect(privateKeyOne).toHaveLength(64)
-    
+
     expect(publicKeyOne).toEqual(publicKeyTwo)
     expect(privateKeyOne).toEqual(privateKeyTwo)
   })

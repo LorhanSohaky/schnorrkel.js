@@ -50,17 +50,17 @@ describe('testing nizkctf', () => {
 
   it('should generate key pair for the challenge', async () => {
     const flag = 'CTF-BR{123}'
-    const salt = Buffer.from('KoVNy6Blq3vFpmdgAXO9MQ==','base64')
+    const salt = Buffer.from('KoVNy6Blq3vFpmdgAXO9MQ==', 'base64')
     const seed = await argon2.hash(flag, {
       salt,
       timeCost: 2,
       memoryCost: 2048,
-      raw:true
+      raw: true
     }).then(buffer => buffer.toString('hex'))
 
     const challengeKeyPair = getKeyPairFromSeed(seed)
 
-    const  { combinedKey, hashedKey } = Schnorrkel.getCombinedPublicKey([challengeKeyPair.publicKey, serverKeyPair.publicKey], SERVER_SECRET)
+    const { combinedKey, hashedKey } = Schnorrkel.getCombinedPublicKey([challengeKeyPair.publicKey, serverKeyPair.publicKey], SERVER_SECRET)
 
     expect(combinedKey).toBeDefined()
     expect(combinedKey).toBeInstanceOf(Key)
@@ -71,18 +71,18 @@ describe('testing nizkctf', () => {
 
   it('should create a proof of knowledge of the secret key', async () => {
     const flag = 'CTF-BR{123}'
-    const salt = Buffer.from('KoVNy6Blq3vFpmdgAXO9MQ==','base64')
+    const salt = Buffer.from('KoVNy6Blq3vFpmdgAXO9MQ==', 'base64')
     const seed = await argon2.hash(flag, {
       salt,
       timeCost: 2,
       memoryCost: 2048,
-      raw:true
+      raw: true
     }).then(buffer => buffer.toString('hex'))
 
     const challengeKeyPair = getKeyPairFromSeed(seed)
 
     const sha256 = (data: string) => createHash('sha256').update(data).digest('hex')
-    
+
     const teamHash = sha256(TEAM_ID)
     const proof = signProof(Buffer.from(teamHash, 'hex'), challengeKeyPair.privateKey.buffer)
     const proofHex = proof.toString('hex')
@@ -93,41 +93,41 @@ describe('testing nizkctf', () => {
 
   it('should verify the proof of knowledge of the secret key', async () => {
     const flag = 'CTF-BR{123}'
-    const salt = Buffer.from('KoVNy6Blq3vFpmdgAXO9MQ==','base64')
+    const salt = Buffer.from('KoVNy6Blq3vFpmdgAXO9MQ==', 'base64')
     const seed = await argon2.hash(flag, {
       salt,
       timeCost: 2,
       memoryCost: 2048,
-      raw:true
+      raw: true
     }).then(buffer => buffer.toString('hex'))
 
     const challengeKeyPair = getKeyPairFromSeed(seed)
-    
+
     const teamHash = sha256(TEAM_ID)
     const proof = signProof(Buffer.from(teamHash, 'hex'), challengeKeyPair.privateKey.buffer)
-    
+
     const result = verifyProof(Buffer.from(teamHash, 'hex'), proof, challengeKeyPair.publicKey.buffer)
     expect(result).toBeTruthy()
   })
 
   it('should fail to verify the proof of knowledge of the secret key', async () => {
     const flag = 'CTF-BR{123}'
-    const salt = Buffer.from('KoVNy6Blq3vFpmdgAXO9MQ==','base64')
+    const salt = Buffer.from('KoVNy6Blq3vFpmdgAXO9MQ==', 'base64')
     const seed = await argon2.hash(flag, {
       salt,
       timeCost: 2,
       memoryCost: 2048,
-      raw:true
+      raw: true
     }).then(buffer => buffer.toString('hex'))
 
     const challengeKeyPair = getKeyPairFromSeed(seed)
     const otherKeyPair = generateRandomKeys()
 
     const sha256 = (data: string) => createHash('sha256').update(data).digest('hex')
-    
+
     const teamHash = sha256(TEAM_ID)
     const invalidProof = signProof(Buffer.from(teamHash, 'hex'), otherKeyPair.privateKey.buffer)
-    
+
     const result = verifyProof(Buffer.from(teamHash, 'hex'), invalidProof, challengeKeyPair.publicKey.buffer)
     expect(result).toBeFalsy()
   })
@@ -186,5 +186,5 @@ describe('testing nizkctf', () => {
 
     expect(result).toEqual(true)
     expect(kvDb).toEqual({})
-    })
+  })
 })

@@ -2,8 +2,8 @@ import secp256k1 from 'secp256k1'
 
 import { Key, Nonces, PublicNonces, Signature, NoncePairs } from './types'
 
-import { _generateL, _aCoefficient, _generatePublicNonces, _multiSigSign, _hashPrivateKey, _sumSigs, _verify, _generatePk, _sign, _generateHashWithSecret, _multiSigSignWithHash } from './core'
-import { InternalNonces, InternalPublicNonces } from './core/types'
+import { _generateL, _aCoefficient, _generatePublicNonces, _multiSigSign, _hashPrivateKey, _sumSigs, _verify, _generatePk, _sign, _generateHashWithSecret, _multiSigSignWithHash, _signHash, _verifyHash } from './core'
+import { InternalNonces, InternalPublicNonces, InternalSignature } from './core/types'
 import { Challenge, FinalPublicNonce, SignatureOutput } from './types/signature'
 
 class Schnorrkel {
@@ -24,6 +24,46 @@ class Schnorrkel {
 
     this.nonces[hash] = { ...mappedPrivateNonce, ...mappedPublicNonce }
     return hash
+  }
+
+
+  private getMappedPublicNonces(publicNonces: ReadonlyArray<PublicNonces>): InternalPublicNonces[] {
+    return publicNonces.map(publicNonce => {
+      return {
+        kPublic: publicNonce.kPublic.buffer,
+        kTwoPublic: publicNonce.kTwoPublic.buffer,
+      }
+    })
+  }
+
+  private getMappedNonces(): InternalNonces {
+    return Object.fromEntries(Object.entries(this.nonces).map(([hash, nonce]) => {
+      return [
+        hash,
+        {
+          k: nonce.k.buffer,
+          kTwo: nonce.kTwo.buffer,
+          kPublic: nonce.kPublic.buffer,
+          kTwoPublic: nonce.kTwoPublic.buffer,
+        }
+      ]
+    }))
+  }
+
+  private getMultisigOutput(multiSig: InternalSignature): SignatureOutput {
+    return {
+      signature: new Signature(Buffer.from(multiSig.signature)),
+      finalPublicNonce: new FinalPublicNonce(Buffer.from(multiSig.finalPublicNonce)),
+      challenge: new Challenge(Buffer.from(multiSig.challenge)),
+    }
+  }
+
+  static getCombinedAddress(publicKeys: ReadonlyArray<Key>): string {
+    if (publicKeys.length < 2) throw Error('At least 2 public keys should be provided')
+
+    const combinedPublicKey = Schnorrkel.getCombinedPublicKey(publicKeys)
+    const px = _generatePk(combinedPublicKey.combinedKey.buffer)
+    return px
   }
 
   generatePublicNonces(privateKey: Key): PublicNonces {
@@ -57,8 +97,13 @@ class Schnorrkel {
     delete this.nonces[hash]
   }
 
-  static sign(privateKey: Key, msg: string): SignatureOutput {
-    const output = _sign(privateKey.buffer, msg)
+  hasNonces(privateKey: Key): boolean {
+    const hash = _hashPrivateKey(privateKey.buffer)
+    return hash in this.nonces
+  }
+
+  static signHash(privateKey: Key, hash: string): SignatureOutput {
+    const output = _signHash(privateKey.buffer, hash)
 
     return {
       signature: new Signature(Buffer.from(output.signature)),
@@ -67,17 +112,41 @@ class Schnorrkel {
     }
   }
 
-  static sumSigs(signatures: Signature[]): Signature {
+  static sign(privateKey: Key, msg: string, hashFn?: Function | null): SignatureOutput {
+    const output = _sign(privateKey.buffer, msg, hashFn ?? undefined)
+
+    return {
+      signature: new Signature(Buffer.from(output.signature)),
+      finalPublicNonce: new FinalPublicNonce(Buffer.from(output.finalPublicNonce)),
+      challenge: new Challenge(Buffer.from(output.challenge)),
+    }
+  }
+  static sumSigs(signatures: ReadonlyArray<Signature>): Signature {
     const mappedSignatures = signatures.map(signature => signature.buffer)
     const sum = _sumSigs(mappedSignatures)
     return new Signature(Buffer.from(sum))
   }
 
-  static verify(signature: Signature, msg: string, finalPublicNonce: FinalPublicNonce, publicKey: Key): boolean {
-    return _verify(signature.buffer, msg, finalPublicNonce.buffer, publicKey.buffer)
+  static verify(
+    signature: Signature,
+    msg: string,
+    finalPublicNonce: FinalPublicNonce,
+    publicKey: Key,
+    hashFn: Function | null = null
+  ): boolean {
+    return _verify(signature.buffer, msg, finalPublicNonce.buffer, publicKey.buffer, hashFn)
   }
 
-  static getCombinedPublicKey(publicKeys: Array<Key>, hexSecret?: string): {
+  static verifyHash(
+    signature: Signature,
+    hash: string,
+    finalPublicNonce: FinalPublicNonce,
+    publicKey: Key
+  ): boolean {
+    return _verifyHash(signature.buffer, hash, finalPublicNonce.buffer, publicKey.buffer)
+  }
+
+  static getCombinedPublicKey(publicKeys: ReadonlyArray<Key>, hexSecret?: string): {
     combinedKey: Key,
     hashedKey: string,
   } {
@@ -101,25 +170,10 @@ class Schnorrkel {
   multiSigSign(privateKey: Key, msg: string, combinedPublicKey: {
     combinedKey: Key,
     hashedKey: string
-  }, publicNonces: PublicNonces[]): SignatureOutput {
-    const mappedPublicNonce: InternalPublicNonces[] = publicNonces.map(publicNonce => {
-      return {
-        kPublic: publicNonce.kPublic.buffer,
-        kTwoPublic: publicNonce.kTwoPublic.buffer,
-      }
-    })
+  }, publicNonces: ReadonlyArray<PublicNonces>): SignatureOutput {
+    const mappedPublicNonce = this.getMappedPublicNonces(publicNonces)
 
-    const mappedNonces: InternalNonces = Object.fromEntries(Object.entries(this.nonces).map(([hash, nonce]) => {
-      return [
-        hash,
-        {
-          k: nonce.k.buffer,
-          kTwo: nonce.kTwo.buffer,
-          kPublic: nonce.kPublic.buffer,
-          kTwoPublic: nonce.kTwoPublic.buffer,
-        }
-      ]
-    }))
+    const mappedNonces: InternalNonces = this.getMappedNonces()
 
     const musigData = _multiSigSignWithHash(mappedNonces, combinedPublicKey.combinedKey.buffer, combinedPublicKey.hashedKey, privateKey.buffer, msg, mappedPublicNonce)
 
@@ -127,11 +181,7 @@ class Schnorrkel {
     // nonce reusae will lead to private key leakage!
     this.clearNonces(privateKey)
 
-    return {
-      signature: new Signature(Buffer.from(musigData.signature)),
-      finalPublicNonce: new FinalPublicNonce(Buffer.from(musigData.finalPublicNonce)),
-      challenge: new Challenge(Buffer.from(musigData.challenge)),
-    }
+    return this.getMultisigOutput(musigData)
   }
 
   static fromJson(json: string): Schnorrkel {
@@ -167,7 +217,7 @@ class Schnorrkel {
     }
   }
 
-  toJson() {
+  toJson(): string {
     const nonces = Object.fromEntries(Object.entries(this.nonces).map(([hash, nonce]) => {
       return [
         hash,
