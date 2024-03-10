@@ -37,7 +37,7 @@ export const _generateHashWithSecret = (publicKeys: ReadonlyArray<Buffer>, hexSe
     internalPublicKeys = [...internalPublicKeys, secretUint8Array]
   }
 
-  return ethers.utils.keccak256(_concatTypedArrays(internalPublicKeys.sort()))
+  return ethers.utils.keccak256(_concatTypedArrays(internalPublicKeys.sort(Buffer.compare)))
 }
 
 export const _concatTypedArrays = (publicKeys: ReadonlyArray<Buffer>): Buffer => {
