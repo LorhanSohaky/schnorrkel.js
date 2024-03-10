@@ -302,7 +302,7 @@ const challenge = (R: Buffer, msgHash: string, publicKey: Buffer): Buffer => {
   const e = ethers.utils.arrayify(
     ethers.utils.solidityKeccak256(
       ['address', 'uint8', 'bytes32', 'bytes32'],
-      [R_addr, publicKey[0] + 27 - 2, publicKey.slice(1, 33), msgHash]
+      [R_addr, publicKey[0] + 27 - 2, Uint8Array.from(publicKey).slice(1, 33), msgHash]
     )
   )
 
