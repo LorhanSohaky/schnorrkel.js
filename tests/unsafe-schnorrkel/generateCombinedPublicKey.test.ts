@@ -1,8 +1,7 @@
 import { describe, expect, it, expectTypeOf } from 'vitest'
-import { ethers } from 'ethers'
 
 import Schnorrkel, { Key } from '../../src/index'
-import { _hashPrivateKey, generateRandomKeys } from '../../src/core'
+import { _hashPrivateKey, generateRandomKeys, generateRandomSecret } from '../../src/core'
 
 describe('testing getCombinedPublicKey', () => {
   it('should get combined public key', () => {
@@ -43,13 +42,13 @@ describe('testing getCombinedPublicKey', () => {
     expect(value1.hashedKey).toEqual(value2.hashedKey)
   })
 
-  it('should get same combined public key with secret less than 34 bytes', () => {
+  it('should generate combined public key with secret', () => {
     const keyPairOne = generateRandomKeys()
     const keyPairTwo = generateRandomKeys()
     const publicKeys = [keyPairOne.publicKey, keyPairTwo.publicKey]
 
-    for (let i = 1; i < 34; i++) {
-      const secret = Buffer.from(ethers.utils.randomBytes(i)).toString('hex')
+    for (let i = 0; i < 1000; i++) {
+      const secret = generateRandomSecret()
       expect(() => Schnorrkel.getCombinedPublicKey(publicKeys, secret)).not.toThrow()
     }
   })

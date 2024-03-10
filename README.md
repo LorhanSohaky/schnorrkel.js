@@ -68,7 +68,7 @@ const {signature, finalPublicNonce} = Schnorrkel.sign(keyPair.privateKey, msg)
 
 Offchain verification:
 ```ts
-const publicKey: Uint8Array = ... (derived from the privateKey)
+const publicKey: Buffer = ... (derived from the privateKey)
 // signature and finalPublicNonce come from s
 const result = Schnorrkel.verify(signature, msg, finalPublicNonce, publicKey)
 ```

@@ -15,8 +15,8 @@ const EC = elliptic.ec
 const ec = new EC('secp256k1')
 const generatorPoint = ec.g
 
-export const _generateHashWithSecret = (publicKeys: Array<Uint8Array>, hexSecret?: string) => {
-  let internalPublicKeys = publicKeys
+export const _generateHashWithSecret = (publicKeys: ReadonlyArray<Buffer>, hexSecret?: string) => {
+  let internalPublicKeys = publicKeys.slice()
 
   if (typeof hexSecret === 'string') {
     if (hexSecret.length === 0) {
@@ -29,7 +29,7 @@ export const _generateHashWithSecret = (publicKeys: Array<Uint8Array>, hexSecret
       throw new Error('Secret should be a hex string')
     }
 
-    const secretUint8Array = Uint8Array.from(Buffer.from(hexSecret, 'hex'))
+    const secretUint8Array = Buffer.from(Uint8Array.from(Buffer.from(hexSecret, 'hex')))
     if (secretUint8Array.length > 33) {
       throw new Error('Secret should be 33 bytes or less')
     }
@@ -37,46 +37,50 @@ export const _generateHashWithSecret = (publicKeys: Array<Uint8Array>, hexSecret
     internalPublicKeys = [...internalPublicKeys, secretUint8Array]
   }
 
-  return ethers.utils.keccak256(_concatTypedArrays(internalPublicKeys.sort()))
+  return ethers.utils.keccak256(_concatTypedArrays(internalPublicKeys.sort(Buffer.compare)))
 }
 
-export const _generateL = (publicKeys: Array<Uint8Array>) => {
-  return ethers.utils.keccak256(_concatTypedArrays(publicKeys.sort()))
-}
-
-export const _concatTypedArrays = (publicKeys: Uint8Array[]): Uint8Array => {
+export const _concatTypedArrays = (publicKeys: ReadonlyArray<Buffer>): Buffer => {
   const c: Buffer = Buffer.alloc(publicKeys.reduce((partialSum, publicKey) => partialSum + publicKey.length, 0))
   publicKeys.map((publicKey, index) => c.set(publicKey, (index * publicKey.length)))
-  return new Uint8Array(c.buffer)
+  return Buffer.from(c.buffer)
 }
 
 
-export const _aCoefficient = (publicKey: Uint8Array, L: string): Uint8Array => {
-  return ethers.utils.arrayify(ethers.utils.solidityKeccak256(
+export const _aCoefficient = (publicKey: Buffer, L: string): Buffer => {
+  const coefficient = ethers.utils.arrayify(ethers.utils.solidityKeccak256(
     ['bytes', 'bytes'],
     [L, publicKey]
   ))
+
+  return Buffer.from(coefficient)
 }
 
-const _bCoefficient = (combinedPublicKey: Uint8Array, msgHash: string, publicNonces: InternalPublicNonces[]): Uint8Array => {
+const _bCoefficient = (combinedPublicKey: Buffer, msgHash: string, publicNonces: ReadonlyArray<InternalPublicNonces>): Buffer => {
   type KeyOf = keyof InternalPublicNonces
-  const arrayColumn = (arr: Array<InternalPublicNonces>, n: KeyOf) => arr.map(x => x[n])
+  const arrayColumn = (arr: ReadonlyArray<InternalPublicNonces>, n: KeyOf) => arr.map(x => x[n])
   const kPublicNonces = secp256k1.publicKeyCombine(arrayColumn(publicNonces, 'kPublic'))
   const kTwoPublicNonces = secp256k1.publicKeyCombine(arrayColumn(publicNonces, 'kTwoPublic'))
 
-  return ethers.utils.arrayify(ethers.utils.solidityKeccak256(
+  const bCoefficient = ethers.utils.arrayify(ethers.utils.solidityKeccak256(
     ['bytes', 'bytes32', 'bytes', 'bytes'],
     [combinedPublicKey, msgHash, kPublicNonces, kTwoPublicNonces]
   ))
+
+  return Buffer.from(bCoefficient)
 }
 
-
-export const generateRandomKeys = () => {
+const _generateRandomPrivateKey = () => {
   let privKeyBytes: Buffer | undefined
   do {
     privKeyBytes = randomBytes(32)
   } while (!secp256k1.privateKeyVerify(privKeyBytes))
 
+  return privKeyBytes
+}
+
+export const generateRandomKeys = (): KeyPair => {
+  const privKeyBytes = _generateRandomPrivateKey()
   const pubKey = Buffer.from(secp256k1.publicKeyCreate(privKeyBytes))
 
   const data = {
@@ -85,6 +89,10 @@ export const generateRandomKeys = () => {
   }
 
   return new KeyPair(data)
+}
+
+export const generateRandomSecret = () => {
+  return generateRandomKeys().publicKey.toHex()
 }
 
 export const getKeyPairFromSeed = (seed: string) => {
@@ -109,7 +117,7 @@ export const getKeyPairFromSeed = (seed: string) => {
   return new KeyPair(data)
 }
 
-const mergeUint8Arrays = (...arrays: Uint8Array[]): Uint8Array => {
+const mergeUint8Arrays = (...arrays: ReadonlyArray<Uint8Array>): Uint8Array => {
   const totalSize = arrays.reduce((acc, e) => acc + e.length, 0)
   const merged = new Uint8Array(totalSize)
 
@@ -121,7 +129,7 @@ const mergeUint8Arrays = (...arrays: Uint8Array[]): Uint8Array => {
   return merged
 }
 
-export const _hashPrivateKey = (privateKey: Uint8Array): string => {
+export const _hashPrivateKey = (privateKey: Buffer): string => {
   return ethers.utils.keccak256(privateKey)
 }
 
@@ -147,10 +155,10 @@ export const _generatePublicNonces = (privateKey: Buffer): {
 }
 
 const _generateNonce = (): InternalNoncePairs => {
-  const k = ethers.utils.randomBytes(32)
-  const kTwo = ethers.utils.randomBytes(32)
-  const kPublic = secp256k1.publicKeyCreate(k)
-  const kTwoPublic = secp256k1.publicKeyCreate(kTwo)
+  const k = Buffer.from(ethers.utils.randomBytes(32))
+  const kTwo = Buffer.from(ethers.utils.randomBytes(32))
+  const kPublic = Buffer.from(secp256k1.publicKeyCreate(k))
+  const kTwoPublic = Buffer.from(secp256k1.publicKeyCreate(kTwo))
 
   return {
     k,
@@ -160,36 +168,91 @@ const _generateNonce = (): InternalNoncePairs => {
   }
 }
 
-export const _multiSigSign = (nonces: InternalNonces, combinedPublicKey: Uint8Array, privateKey: Uint8Array, msg: string, publicKeys: Uint8Array[], publicNonces: InternalPublicNonces[]): InternalSignature => {
+export const _multiSigSign = (nonces: InternalNonces, combinedPublicKey: Buffer, privateKey: Buffer, msg: string, publicKeys: ReadonlyArray<Buffer>, publicNonces: ReadonlyArray<InternalPublicNonces>): InternalSignature => {
   if (publicKeys.length < 2) {
     throw Error('At least 2 public keys should be provided')
   }
 
-  const localPk = new Uint8Array(privateKey)
+  const localPk = Buffer.from(privateKey)
   const xHashed = _hashPrivateKey(localPk)
   if (!(xHashed in nonces) || Object.keys(nonces[xHashed]).length === 0) {
     throw Error('Nonces should be exchanged before signing')
   }
 
-  const publicKey = secp256k1.publicKeyCreate(localPk)
-  const L = _generateL(publicKeys)
+  const publicKey = Buffer.from(secp256k1.publicKeyCreate(localPk))
+  const L = _generateHashWithSecret(publicKeys)
   const msgHash = _hashMessage(msg)
   const a = _aCoefficient(publicKey, L)
   const b = _bCoefficient(combinedPublicKey, msgHash, publicNonces)
 
   const effectiveNonces = publicNonces.map((batch) => {
-    return secp256k1.publicKeyCombine([batch.kPublic, secp256k1.publicKeyTweakMul(batch.kTwoPublic, b)])
+    return Buffer.from(secp256k1.publicKeyCombine([batch.kPublic, secp256k1.publicKeyTweakMul(batch.kTwoPublic, b)]))
   })
-  const signerEffectiveNonce = secp256k1.publicKeyCombine([
+  const signerEffectiveNonce = Buffer.from(secp256k1.publicKeyCombine([
     nonces[xHashed].kPublic,
     secp256k1.publicKeyTweakMul(nonces[xHashed].kTwoPublic, b)
-  ])
+  ]))
   const inArray = effectiveNonces.filter(nonce => areBuffersSame(nonce, signerEffectiveNonce)).length != 0
   if (!inArray) {
     throw Error('Passed nonces are invalid')
   }
 
-  const R = secp256k1.publicKeyCombine(effectiveNonces)
+  const R = Buffer.from(secp256k1.publicKeyCombine(effectiveNonces))
+  const e = challenge(R, msgHash, combinedPublicKey)
+
+  const { k, kTwo } = nonces[xHashed]
+
+  // xe = x * e
+  const xe = secp256k1.privateKeyTweakMul(localPk, e)
+
+  // xea = a * xe
+  const xea = secp256k1.privateKeyTweakMul(xe, a)
+
+  // k + xea
+  const kPlusxea = secp256k1.privateKeyTweakAdd(xea, k)
+
+  // kTwo * b
+  const kTwoMulB = secp256k1.privateKeyTweakMul(kTwo, b)
+
+  // k + kTwoMulB + xea
+  const final = secp256k1.privateKeyTweakAdd(kPlusxea, kTwoMulB)
+
+  // s = k + xea mod(n)
+  const signature = Buffer.from(bigi.fromBuffer(final).mod(n).toBuffer(32))
+
+  return {
+    signature,
+    challenge: e,
+    finalPublicNonce: R
+  }
+}
+
+export const _multiSigSignWithHash = (nonces: InternalNonces, combinedPublicKey: Buffer, hashedCombinedPublicKeys: string, privateKey: Buffer, msg: string, publicNonces: ReadonlyArray<InternalPublicNonces>): InternalSignature => {
+  const localPk = Buffer.from(privateKey)
+  const xHashed = _hashPrivateKey(localPk)
+  if (!(xHashed in nonces) || Object.keys(nonces[xHashed]).length === 0) {
+    throw Error('Nonces should be exchanged before signing')
+  }
+
+  const publicKey = Buffer.from(secp256k1.publicKeyCreate(localPk))
+  const L = hashedCombinedPublicKeys
+  const msgHash = _hashMessage(msg)
+  const a = _aCoefficient(publicKey, L)
+  const b = _bCoefficient(combinedPublicKey, msgHash, publicNonces)
+
+  const effectiveNonces = publicNonces.map((batch) => {
+    return Buffer.from(secp256k1.publicKeyCombine([batch.kPublic, secp256k1.publicKeyTweakMul(batch.kTwoPublic, b)]))
+  })
+  const signerEffectiveNonce = Buffer.from(secp256k1.publicKeyCombine([
+    nonces[xHashed].kPublic,
+    secp256k1.publicKeyTweakMul(nonces[xHashed].kTwoPublic, b)
+  ]))
+  const inArray = effectiveNonces.filter(nonce => areBuffersSame(nonce, signerEffectiveNonce)).length != 0
+  if (!inArray) {
+    throw Error('Passed nonces are invalid')
+  }
+
+  const R = Buffer.from(secp256k1.publicKeyCombine(effectiveNonces))
   const e = challenge(R, msgHash, combinedPublicKey)
 
   const { k, kTwo } = nonces[xHashed]
@@ -210,72 +273,20 @@ export const _multiSigSign = (nonces: InternalNonces, combinedPublicKey: Uint8Ar
   const final = secp256k1.privateKeyTweakAdd(kPlusxea, kTwoMulB)
 
 
+  // s = k + xea mod(n)
+  const signature = bigi.fromBuffer(final).mod(n).toBuffer(32)
   return {
-    // s = k + xea mod(n)
-    signature: bigi.fromBuffer(final).mod(n).toBuffer(32),
+    signature,
     challenge: e,
     finalPublicNonce: R
   }
 }
 
-export const _multiSigSignWithHash = (nonces: InternalNonces, combinedPublicKey: Uint8Array, hashedCombinedPublicKeys: string, privateKey: Uint8Array, msg: string, publicNonces: InternalPublicNonces[]): InternalSignature => {
-  const xHashed = _hashPrivateKey(privateKey)
-  if (!(xHashed in nonces) || Object.keys(nonces[xHashed]).length === 0) {
-    throw Error('Nonces should be exchanged before signing')
-  }
-
-  const publicKey = secp256k1.publicKeyCreate(privateKey)
-  const L = hashedCombinedPublicKeys
-  const msgHash = _hashMessage(msg)
-  const a = _aCoefficient(publicKey, L)
-  const b = _bCoefficient(combinedPublicKey, msgHash, publicNonces)
-
-  const effectiveNonces = publicNonces.map((batch) => {
-    return secp256k1.publicKeyCombine([batch.kPublic, secp256k1.publicKeyTweakMul(batch.kTwoPublic, b)])
-  })
-  const signerEffectiveNonce = secp256k1.publicKeyCombine([
-    nonces[xHashed].kPublic,
-    secp256k1.publicKeyTweakMul(nonces[xHashed].kTwoPublic, b)
-  ])
-  const inArray = effectiveNonces.filter(nonce => areBuffersSame(nonce, signerEffectiveNonce)).length != 0
-  if (!inArray) {
-    throw Error('Passed nonces are invalid')
-  }
-
-  const R = secp256k1.publicKeyCombine(effectiveNonces)
-  const e = challenge(R, msgHash, combinedPublicKey)
-
-  const { k, kTwo } = nonces[xHashed]
-
-  // xe = x * e
-  const xe = secp256k1.privateKeyTweakMul(privateKey, e)
-
-  // xea = a * xe
-  const xea = secp256k1.privateKeyTweakMul(xe, a)
-
-  // k + xea
-  const kPlusxea = secp256k1.privateKeyTweakAdd(xea, k)
-
-  // kTwo * b
-  const kTwoMulB = secp256k1.privateKeyTweakMul(kTwo, b)
-
-  // k + kTwoMulB + xea
-  const final = secp256k1.privateKeyTweakAdd(kPlusxea, kTwoMulB)
-
-
-  return {
-    // s = k + xea mod(n)
-    signature: bigi.fromBuffer(final).mod(n).toBuffer(32),
-    challenge: e,
-    finalPublicNonce: R
-  }
-}
-
-const areBuffersSame = (buf1: Uint8Array, buf2: Uint8Array): boolean => {
+const areBuffersSame = (buf1: Buffer, buf2: Buffer): boolean => {
   if (buf1.byteLength != buf2.byteLength) return false
 
-  var dv1 = new Int8Array(buf1)
-  var dv2 = new Int8Array(buf2)
+  var dv1 = Buffer.from(buf1)
+  var dv2 = Buffer.from(buf2)
   for (var i = 0; i != buf1.byteLength; i++) {
     if (dv1[i] != dv2[i]) return false
   }
@@ -283,21 +294,23 @@ const areBuffersSame = (buf1: Uint8Array, buf2: Uint8Array): boolean => {
   return true
 }
 
-const challenge = (R: Uint8Array, msgHash: string, publicKey: Uint8Array): Uint8Array => {
+const challenge = (R: Buffer, msgHash: string, publicKey: Buffer): Buffer => {
   // convert R to address
   var R_uncomp = secp256k1.publicKeyConvert(R, false)
   var R_addr = ethers.utils.arrayify(ethers.utils.keccak256(R_uncomp.slice(1, 65))).slice(12, 32)
 
   // e = keccak256(address(R) || compressed publicKey || msgHash)
-  return ethers.utils.arrayify(
+  const e = ethers.utils.arrayify(
     ethers.utils.solidityKeccak256(
       ['address', 'uint8', 'bytes32', 'bytes32'],
-      [R_addr, publicKey[0] + 27 - 2, publicKey.slice(1, 33), msgHash]
+      [R_addr, publicKey[0] + 27 - 2, Uint8Array.from(publicKey).slice(1, 33), msgHash]
     )
   )
+
+  return Buffer.from(e)
 }
 
-export const _sumSigs = (signatures: Uint8Array[]): Buffer => {
+export const _sumSigs = (signatures: Buffer[]): Buffer => {
   let combined = bigi.fromBuffer(signatures[0])
   signatures.shift()
   signatures.forEach(sig => {
@@ -310,7 +323,7 @@ export const _hashMessage = (message: string): string => {
   return ethers.utils.solidityKeccak256(['string'], [message])
 }
 
-export const _verify = (s: Uint8Array, msg: string, R: Uint8Array, publicKey: Uint8Array): boolean => {
+export const _verify = (s: Buffer, msg: string, R: Buffer, publicKey: Buffer): boolean => {
   const hash = _hashMessage(msg)
   const eC = challenge(R, hash, publicKey)
   const sG = generatorPoint.mul(ethers.utils.arrayify(s))
@@ -322,19 +335,15 @@ export const _verify = (s: Uint8Array, msg: string, R: Uint8Array, publicKey: Ui
   return sG.eq(RplusPe)
 }
 
-export const _generatePk = (combinedPublicKey: Uint8Array): string => {
-  const px = ethers.utils.hexlify(combinedPublicKey.slice(1, 33))
-  return '0x' + px.slice(px.length - 40, px.length)
-}
+export const _sign = (privateKey: Buffer, msg: string): InternalSignature => {
+  const localPk = Buffer.from(privateKey)
+  const publicKey = Buffer.from(secp256k1.publicKeyCreate((localPk as any)))
 
-export const _sign = (privateKey: Uint8Array, msg: string): InternalSignature  => {
-  const localPk = new Uint8Array(privateKey)
   const hash = _hashMessage(msg)
-  const publicKey = secp256k1.publicKeyCreate((localPk as any))
 
   // R = G * k
   var k = ethers.utils.randomBytes(32)
-  var R = secp256k1.publicKeyCreate(k)
+  var R = Buffer.from(secp256k1.publicKeyCreate(k))
 
   // e = h(address(R) || compressed pubkey || m)
   var e = challenge(R, hash, publicKey)
@@ -343,7 +352,7 @@ export const _sign = (privateKey: Uint8Array, msg: string): InternalSignature  =
   var xe = secp256k1.privateKeyTweakMul((localPk as any), e)
 
   // s = k + xe
-  var s = secp256k1.privateKeyTweakAdd(k, xe)
+  var s = Buffer.from(secp256k1.privateKeyTweakAdd(k, xe))
 
   return {
     finalPublicNonce: R,

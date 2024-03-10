@@ -173,7 +173,7 @@ describe('testing nizkctf', () => {
     const prevState = kvDb[session]
     schnorrkelServer = Schnorrkel.fromJson(prevState.server.state)
     const serverPrevPublicNonce = schnorrkelServer.getPublicNonces(serverKeyPair.privateKey)
-    const serverPublicNonces: Array<PublicNonces> = [serverPrevPublicNonce, {
+    const serverPublicNonces: ReadonlyArray<PublicNonces> = [serverPrevPublicNonce, {
       kPublic: Key.fromHex(prevState.client.publicNonce.kPublic),
       kTwoPublic: Key.fromHex(prevState.client.publicNonce.kTwoPublic),
     }]

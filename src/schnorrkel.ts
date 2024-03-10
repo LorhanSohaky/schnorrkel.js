@@ -2,7 +2,7 @@ import secp256k1 from 'secp256k1'
 
 import { Key, Nonces, PublicNonces, Signature, NoncePairs } from './types'
 
-import { _generateL, _aCoefficient, _generatePublicNonces, _multiSigSign, _hashPrivateKey, _sumSigs, _verify, _generatePk, _sign, _generateHashWithSecret, _multiSigSignWithHash } from './core'
+import { _aCoefficient, _generatePublicNonces, _multiSigSign, _hashPrivateKey, _sumSigs, _verify, _sign, _generateHashWithSecret, _multiSigSignWithHash } from './core'
 import { InternalNonces, InternalPublicNonces } from './core/types'
 import { Challenge, FinalPublicNonce, SignatureOutput } from './types/signature'
 
@@ -67,7 +67,7 @@ class Schnorrkel {
     }
   }
 
-  static sumSigs(signatures: Signature[]): Signature {
+  static sumSigs(signatures: ReadonlyArray<Signature>): Signature {
     const mappedSignatures = signatures.map(signature => signature.buffer)
     const sum = _sumSigs(mappedSignatures)
     return new Signature(Buffer.from(sum))
@@ -77,7 +77,7 @@ class Schnorrkel {
     return _verify(signature.buffer, msg, finalPublicNonce.buffer, publicKey.buffer)
   }
 
-  static getCombinedPublicKey(publicKeys: Array<Key>, hexSecret?: string): {
+  static getCombinedPublicKey(publicKeys: ReadonlyArray<Key>, hexSecret?: string): {
     combinedKey: Key,
     hashedKey: string,
   } {
@@ -101,8 +101,8 @@ class Schnorrkel {
   multiSigSign(privateKey: Key, msg: string, combinedPublicKey: {
     combinedKey: Key,
     hashedKey: string
-  }, publicNonces: PublicNonces[]): SignatureOutput {
-    const mappedPublicNonce: InternalPublicNonces[] = publicNonces.map(publicNonce => {
+  }, publicNonces: ReadonlyArray<PublicNonces>): SignatureOutput {
+    const mappedPublicNonce: ReadonlyArray<InternalPublicNonces> = publicNonces.map(publicNonce => {
       return {
         kPublic: publicNonce.kPublic.buffer,
         kTwoPublic: publicNonce.kTwoPublic.buffer,
