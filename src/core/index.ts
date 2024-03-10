@@ -15,8 +15,8 @@ const EC = elliptic.ec
 const ec = new EC('secp256k1')
 const generatorPoint = ec.g
 
-export const _generateHashWithSecret = (publicKeys: Array<Buffer>, hexSecret?: string) => {
-  let internalPublicKeys = publicKeys
+export const _generateHashWithSecret = (publicKeys: ReadonlyArray<Buffer>, hexSecret?: string) => {
+  let internalPublicKeys = publicKeys.slice()
 
   if (typeof hexSecret === 'string') {
     if (hexSecret.length === 0) {
@@ -40,7 +40,7 @@ export const _generateHashWithSecret = (publicKeys: Array<Buffer>, hexSecret?: s
   return ethers.utils.keccak256(_concatTypedArrays(internalPublicKeys.sort()))
 }
 
-export const _concatTypedArrays = (publicKeys: Buffer[]): Buffer => {
+export const _concatTypedArrays = (publicKeys: ReadonlyArray<Buffer>): Buffer => {
   const c: Buffer = Buffer.alloc(publicKeys.reduce((partialSum, publicKey) => partialSum + publicKey.length, 0))
   publicKeys.map((publicKey, index) => c.set(publicKey, (index * publicKey.length)))
   return Buffer.from(c.buffer)
@@ -56,9 +56,9 @@ export const _aCoefficient = (publicKey: Buffer, L: string): Buffer => {
   return Buffer.from(coefficient)
 }
 
-const _bCoefficient = (combinedPublicKey: Buffer, msgHash: string, publicNonces: InternalPublicNonces[]): Buffer => {
+const _bCoefficient = (combinedPublicKey: Buffer, msgHash: string, publicNonces: ReadonlyArray<InternalPublicNonces>): Buffer => {
   type KeyOf = keyof InternalPublicNonces
-  const arrayColumn = (arr: Array<InternalPublicNonces>, n: KeyOf) => arr.map(x => x[n])
+  const arrayColumn = (arr: ReadonlyArray<InternalPublicNonces>, n: KeyOf) => arr.map(x => x[n])
   const kPublicNonces = secp256k1.publicKeyCombine(arrayColumn(publicNonces, 'kPublic'))
   const kTwoPublicNonces = secp256k1.publicKeyCombine(arrayColumn(publicNonces, 'kTwoPublic'))
 
@@ -117,7 +117,7 @@ export const getKeyPairFromSeed = (seed: string) => {
   return new KeyPair(data)
 }
 
-const mergeUint8Arrays = (...arrays: Uint8Array[]): Uint8Array => {
+const mergeUint8Arrays = (...arrays: ReadonlyArray<Uint8Array>): Uint8Array => {
   const totalSize = arrays.reduce((acc, e) => acc + e.length, 0)
   const merged = new Uint8Array(totalSize)
 
@@ -168,7 +168,7 @@ const _generateNonce = (): InternalNoncePairs => {
   }
 }
 
-export const _multiSigSign = (nonces: InternalNonces, combinedPublicKey: Buffer, privateKey: Buffer, msg: string, publicKeys: Buffer[], publicNonces: InternalPublicNonces[]): InternalSignature => {
+export const _multiSigSign = (nonces: InternalNonces, combinedPublicKey: Buffer, privateKey: Buffer, msg: string, publicKeys: ReadonlyArray<Buffer>, publicNonces: ReadonlyArray<InternalPublicNonces>): InternalSignature => {
   if (publicKeys.length < 2) {
     throw Error('At least 2 public keys should be provided')
   }
@@ -227,7 +227,7 @@ export const _multiSigSign = (nonces: InternalNonces, combinedPublicKey: Buffer,
   }
 }
 
-export const _multiSigSignWithHash = (nonces: InternalNonces, combinedPublicKey: Buffer, hashedCombinedPublicKeys: string, privateKey: Buffer, msg: string, publicNonces: InternalPublicNonces[]): InternalSignature => {
+export const _multiSigSignWithHash = (nonces: InternalNonces, combinedPublicKey: Buffer, hashedCombinedPublicKeys: string, privateKey: Buffer, msg: string, publicNonces: ReadonlyArray<InternalPublicNonces>): InternalSignature => {
   const xHashed = _hashPrivateKey(privateKey)
   if (!(xHashed in nonces) || Object.keys(nonces[xHashed]).length === 0) {
     throw Error('Nonces should be exchanged before signing')
