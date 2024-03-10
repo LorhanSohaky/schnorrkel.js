@@ -228,12 +228,13 @@ export const _multiSigSign = (nonces: InternalNonces, combinedPublicKey: Buffer,
 }
 
 export const _multiSigSignWithHash = (nonces: InternalNonces, combinedPublicKey: Buffer, hashedCombinedPublicKeys: string, privateKey: Buffer, msg: string, publicNonces: ReadonlyArray<InternalPublicNonces>): InternalSignature => {
-  const xHashed = _hashPrivateKey(privateKey)
+  const localPk = Buffer.from(privateKey)
+  const xHashed = _hashPrivateKey(localPk)
   if (!(xHashed in nonces) || Object.keys(nonces[xHashed]).length === 0) {
     throw Error('Nonces should be exchanged before signing')
   }
 
-  const publicKey = Buffer.from(secp256k1.publicKeyCreate(privateKey))
+  const publicKey = Buffer.from(secp256k1.publicKeyCreate(localPk))
   const L = hashedCombinedPublicKeys
   const msgHash = _hashMessage(msg)
   const a = _aCoefficient(publicKey, L)
@@ -257,7 +258,7 @@ export const _multiSigSignWithHash = (nonces: InternalNonces, combinedPublicKey:
   const { k, kTwo } = nonces[xHashed]
 
   // xe = x * e
-  const xe = secp256k1.privateKeyTweakMul(privateKey, e)
+  const xe = secp256k1.privateKeyTweakMul(localPk, e)
 
   // xea = a * xe
   const xea = secp256k1.privateKeyTweakMul(xe, a)
